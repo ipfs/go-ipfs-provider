@@ -5,8 +5,6 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
-// System defines the interface for interacting with the value
-// provider system
 type System interface {
 	Run()
 	Close() error
@@ -19,7 +17,6 @@ type system struct {
 	reprovider Reprovider
 }
 
-// NewSystem constructs a new provider system from a provider and reprovider
 func NewSystem(provider Provider, reprovider Reprovider) System {
 	return &system{provider, reprovider}
 }
