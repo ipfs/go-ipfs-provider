@@ -5,8 +5,6 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
-// System defines the interface for interacting with the value
-// provider system
 type System interface {
 	Run()
 	Close() error

@@ -16,7 +16,6 @@ var logP = logging.Logger("provider.simple")
 
 const provideOutgoingWorkerLimit = 8
 
-// Provider announces blocks to the network
 type Provider struct {
 	ctx context.Context
 	// the CIDs for which provide announcements should be made
