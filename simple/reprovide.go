@@ -7,11 +7,8 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-cidutil"
 	blocks "github.com/ipfs/go-ipfs-blockstore"
-	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log"
-	"github.com/ipfs/go-merkledag"
 	"github.com/ipfs/go-verifcid"
 	"github.com/libp2p/go-libp2p-core/routing"
 )
@@ -166,64 +163,4 @@ func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
 		return bstore.AllKeysChan(ctx)
 	}
-}
-
-// Pinner interface defines how the simple.Reprovider wants to interact
-// with a Pinning service
-type Pinner interface {
-	DirectKeys() []cid.Cid
-	RecursiveKeys() []cid.Cid
-}
-
-// NewPinnedProvider returns provider supplying pinned keys
-func NewPinnedProvider(onlyRoots bool, pinning Pinner, dag ipld.DAGService) KeyChanFunc {
-	return func(ctx context.Context) (<-chan cid.Cid, error) {
-		set, err := pinSet(ctx, pinning, dag, onlyRoots)
-		if err != nil {
-			return nil, err
-		}
-
-		outCh := make(chan cid.Cid)
-		go func() {
-			defer close(outCh)
-			for c := range set.New {
-				select {
-				case <-ctx.Done():
-					return
-				case outCh <- c:
-				}
-			}
-
-		}()
-
-		return outCh, nil
-	}
-}
-
-func pinSet(ctx context.Context, pinning Pinner, dag ipld.DAGService, onlyRoots bool) (*cidutil.StreamingSet, error) {
-	set := cidutil.NewStreamingSet()
-
-	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		defer close(set.New)
-
-		for _, key := range pinning.DirectKeys() {
-			set.Visitor(ctx)(key)
-		}
-
-		for _, key := range pinning.RecursiveKeys() {
-			set.Visitor(ctx)(key)
-
-			if !onlyRoots {
-				err := merkledag.EnumerateChildren(ctx, merkledag.GetLinksWithDAG(dag), key, set.Visitor(ctx))
-				if err != nil {
-					logR.Errorf("reprovide indirect pins: %s", err)
-					return
-				}
-			}
-		}
-	}()
-
-	return set, nil
 }
