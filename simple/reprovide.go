@@ -18,7 +18,7 @@ import (
 
 var logR = logging.Logger("reprovider.simple")
 
-//KeyChanFunc is function streaming CIDs to pass to content routing
+// KeyChanFunc is function streaming CIDs to pass to content routing
 type KeyChanFunc func(context.Context) (<-chan cid.Cid, error)
 type doneFunc func(error)
 
@@ -56,7 +56,7 @@ func (rp *Reprovider) Close() error {
 func (rp *Reprovider) Run() {
 	// dont reprovide immediately.
 	// may have just started the daemon and shutting it down immediately.
-	// probability( up another minute | uptime ) increases with uptime.
+	// probability ( up another minute | uptime ) increases with uptime.
 	after := time.After(time.Minute)
 	var done doneFunc
 	for {
@@ -71,8 +71,8 @@ func (rp *Reprovider) Run() {
 		case <-after:
 		}
 
-		//'mute' the trigger channel so when `ipfs bitswap reprovide` is called
-		//a 'reprovider is already running' error is returned
+		// 'mute' the trigger channel so when `ipfs bitswap reprovide` is called
+		// a 'reprovider is already running' error is returned
 		unmute := rp.muteTrigger()
 
 		err := rp.Reprovide()
@@ -171,8 +171,11 @@ func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
 // Pinner interface defines how the simple.Reprovider wants to interact
 // with a Pinning service
 type Pinner interface {
-	DirectKeys() []cid.Cid
-	RecursiveKeys() []cid.Cid
+	// DirectKeys returns all directly pinned cids
+	DirectKeys(ctx context.Context) ([]cid.Cid, error)
+
+	// DirectKeys returns all recursively pinned cids
+	RecursiveKeys(ctx context.Context) ([]cid.Cid, error)
 }
 
 // NewPinnedProvider returns provider supplying pinned keys
@@ -208,11 +211,21 @@ func pinSet(ctx context.Context, pinning Pinner, dag ipld.DAGService, onlyRoots 
 		defer cancel()
 		defer close(set.New)
 
-		for _, key := range pinning.DirectKeys() {
+		dkeys, err := pinning.DirectKeys(ctx)
+		if err != nil {
+			logR.Errorf("reprovide direct pins: %s", err)
+			return
+		}
+		for _, key := range dkeys {
 			set.Visitor(ctx)(key)
 		}
 
-		for _, key := range pinning.RecursiveKeys() {
+		rkeys, err := pinning.RecursiveKeys(ctx)
+		if err != nil {
+			logR.Errorf("reprovide recursive pins: %s", err)
+			return
+		}
+		for _, key := range rkeys {
 			if onlyRoots {
 				set.Visitor(ctx)(key)
 			} else {

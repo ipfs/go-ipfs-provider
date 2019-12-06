@@ -24,7 +24,7 @@ type Provider struct {
 	contentRouting routing.ContentRouting
 	// how long to wait for announce to complete before giving up
 	timeout time.Duration
-	// how many workers concurrently work through thhe queue
+	// how many workers concurrently work through the queue
 	workerLimit int
 }
 
