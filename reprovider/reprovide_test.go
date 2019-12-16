@@ -2,6 +2,7 @@ package sreprov_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -33,9 +34,12 @@ func setupRouting(t *testing.T) (clA, clB mock.Client, idA, idB peer.ID) {
 	return clA, clB, iidA.ID(), iidB.ID()
 }
 
-func setupDag(t *testing.T) (nodes []cid.Cid, bstore blockstore.Blockstore) {
+func setupDag(t *testing.T, pairNumber int) (nodes []cid.Cid, bstore blockstore.Blockstore) {
 	bstore = blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
-	for _, data := range []string{"foo", "bar"} {
+
+	for i := 0; i < pairNumber; i++ {
+		data := fmt.Sprintf("data%d", i)
+
 		blk, err := cbor.WrapObject(data, mh.SHA2_256, -1)
 		if err != nil {
 			t.Fatal(err)
@@ -63,34 +67,41 @@ func setupDag(t *testing.T) (nodes []cid.Cid, bstore blockstore.Blockstore) {
 }
 
 func TestReprovide(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Run("single worker", testReprovide(MaxWorkers(1)))
+	t.Run("multiple workers", testReprovide(MaxWorkers(8)))
+}
 
-	clA, clB, idA, _ := setupRouting(t)
-	nodes, bstore := setupDag(t)
+func testReprovide(opts ...Option) func(t *testing.T) {
+	return func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	keyProvider := NewBlockstoreProvider(bstore)
-	reprov := NewReprovider(ctx, time.Hour, clA, keyProvider)
-	err := reprov.Reprovide()
-	if err != nil {
-		t.Fatal(err)
-	}
+		clA, clB, idA, _ := setupRouting(t)
+		nodes, bstore := setupDag(t, 100)
 
-	var providers []peer.AddrInfo
-	maxProvs := 100
-
-	for _, c := range nodes {
-		provChan := clB.FindProvidersAsync(ctx, c, maxProvs)
-		for p := range provChan {
-			providers = append(providers, p)
+		keyProvider := NewBlockstoreProvider(bstore)
+		reprov := NewReprovider(ctx, time.Hour, clA, keyProvider, opts...)
+		err := reprov.Reprovide()
+		if err != nil {
+			t.Fatal(err)
 		}
 
-		if len(providers) == 0 {
-			t.Fatal("Should have gotten a provider")
-		}
+		maxProvs := 100
 
-		if providers[0].ID != idA {
-			t.Fatal("Somehow got the wrong peer back as a provider.")
+		for _, c := range nodes {
+			provChan := clB.FindProvidersAsync(ctx, c, maxProvs)
+			var providers []peer.AddrInfo
+			for p := range provChan {
+				providers = append(providers, p)
+			}
+
+			if len(providers) == 0 {
+				t.Fatal("Should have gotten a provider")
+			}
+
+			if providers[0].ID != idA {
+				t.Fatal("Somehow got the wrong peer back as a provider.")
+			}
 		}
 	}
 }
@@ -112,7 +123,7 @@ func TestReprovidePinned(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	nodes, bstore := setupDag(t)
+	nodes, bstore := setupDag(t, 2)
 
 	dag := merkledag.NewDAGService(bsrv.New(bstore, offline.Exchange(bstore)))
 
