@@ -30,9 +30,9 @@ import (
 	"time"
 
 	"github.com/ipfs/go-ipfs-provider"
-	"github.com/ipfs/go-ipfs-provider/provider"
+	sprov "github.com/ipfs/go-ipfs-provider/provider"
 	"github.com/ipfs/go-ipfs-provider/queue"
-	"github.com/ipfs/go-ipfs-provider/reprovider"
+	sreprov "github.com/ipfs/go-ipfs-provider/reprovider"
 )
 
 rsys := (your routing system here)
