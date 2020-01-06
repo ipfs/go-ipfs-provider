@@ -30,8 +30,9 @@ import (
 	"time"
 
 	"github.com/ipfs/go-ipfs-provider"
+	"github.com/ipfs/go-ipfs-provider/provider"
 	"github.com/ipfs/go-ipfs-provider/queue"
-	"github.com/ipfs/go-ipfs-provider/simple"
+	"github.com/ipfs/go-ipfs-provider/reprovider"
 )
 
 rsys := (your routing system here)
@@ -40,8 +41,8 @@ cid := (your cid to provide here)
 
 q := queue.NewQueue(context.Background(), "example", dstore)
 
-reprov := simple.NewReprovider(context.Background(), time.Hour * 12, rsys, simple.NewBlockstoreProvider)
-prov := simple.NewProvider(context.Background(), q, rsys)
+reprov := sreprov.NewReprovider(context.Background(), time.Hour*12, rsys, sreprov.NewBlockstoreProvider)
+prov := sprov.NewProvider(context.Background(), q, rsys)
 sys := provider.NewSystem(prov, reprov)
 
 sys.Run()

@@ -1,4 +1,4 @@
-package simple_test
+package sprov_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 	q "github.com/ipfs/go-ipfs-provider/queue"
 
-	. "github.com/ipfs/go-ipfs-provider/simple"
+	. "github.com/ipfs/go-ipfs-provider/provider"
 )
 
 var blockGenerator = blocksutil.NewBlockGenerator()
