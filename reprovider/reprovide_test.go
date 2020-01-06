@@ -1,4 +1,4 @@
-package simple_test
+package sreprov_test
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	testutil "github.com/libp2p/go-libp2p-testing/net"
 	mh "github.com/multiformats/go-multihash"
 
-	. "github.com/ipfs/go-ipfs-provider/simple"
+	. "github.com/ipfs/go-ipfs-provider/reprovider"
 )
 
 func setupRouting(t *testing.T) (clA, clB mock.Client, idA, idB peer.ID) {
