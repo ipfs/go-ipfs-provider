@@ -3,6 +3,7 @@ package sreprov
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -33,18 +34,39 @@ type Reprovider struct {
 	keyProvider KeyChanFunc
 
 	tick time.Duration
+	// how many workers concurrently work to provide values
+	workerLimit int
+}
+
+// Option defines the functional option type that can be used to configure
+// reprovider instances
+type Option func(*Reprovider)
+
+// MaxWorkers is an option to set the max workers on a reprovider
+func MaxWorkers(count int) Option {
+	return func(p *Reprovider) {
+		p.workerLimit = count
+	}
 }
 
 // NewReprovider creates new Reprovider instance.
-func NewReprovider(ctx context.Context, reprovideIniterval time.Duration, rsys routing.ContentRouting, keyProvider KeyChanFunc) *Reprovider {
-	return &Reprovider{
+func NewReprovider(ctx context.Context, reprovideIniterval time.Duration, rsys routing.ContentRouting, keyProvider KeyChanFunc, options ...Option) *Reprovider {
+	r := &Reprovider{
 		ctx:     ctx,
 		trigger: make(chan doneFunc),
 
 		rsys:        rsys,
 		keyProvider: keyProvider,
 		tick:        reprovideIniterval,
+
+		workerLimit: 8,
 	}
+
+	for _, option := range options {
+		option(r)
+	}
+
+	return r
 }
 
 // Close the reprovider
@@ -71,8 +93,8 @@ func (rp *Reprovider) Run() {
 		case <-after:
 		}
 
-		//'mute' the trigger channel so when `ipfs bitswap reprovide` is called
-		//a 'reprovider is already running' error is returned
+		// 'mute' the trigger channel so when `ipfs bitswap reprovide` is called
+		// a 'reprovider is already running' error is returned
 		unmute := rp.muteTrigger()
 
 		err := rp.Reprovide()
@@ -96,26 +118,39 @@ func (rp *Reprovider) Reprovide() error {
 	if err != nil {
 		return fmt.Errorf("failed to get key chan: %s", err)
 	}
-	for c := range keychan {
-		// hash security
-		if err := verifcid.ValidateCid(c); err != nil {
-			logR.Errorf("insecure hash in reprovider, %s (%s)", c, err)
-			continue
-		}
-		op := func() error {
-			err := rp.rsys.Provide(rp.ctx, c, true)
-			if err != nil {
-				logR.Debugf("Failed to provide key: %s", err)
-			}
-			return err
-		}
 
-		err := backoff.Retry(op, backoff.WithContext(backoff.NewExponentialBackOff(), rp.ctx))
-		if err != nil {
-			logR.Debugf("Providing failed after number of retries: %s", err)
-			return err
-		}
+	var wg sync.WaitGroup
+
+	for workers := 0; workers < rp.workerLimit; workers++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for c := range keychan {
+				// hash security
+				if err := verifcid.ValidateCid(c); err != nil {
+					logR.Errorf("insecure hash in reprovider, %s (%s)", c, err)
+					continue
+				}
+				op := func() error {
+					err := rp.rsys.Provide(rp.ctx, c, true)
+					if err != nil {
+						logR.Debugf("Failed to provide key: %s", err)
+					}
+					return err
+				}
+
+				err := backoff.Retry(op, backoff.WithContext(backoff.NewExponentialBackOff(), rp.ctx))
+				if err != nil {
+					logR.Debugf("Providing failed after number of retries: %s", err)
+				}
+			}
+		}()
 	}
+
+	wg.Wait()
+
 	return nil
 }
 
