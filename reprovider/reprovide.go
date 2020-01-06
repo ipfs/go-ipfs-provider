@@ -36,6 +36,8 @@ type Reprovider struct {
 	tick time.Duration
 	// how many workers concurrently work to provide values
 	workerLimit int
+
+	notifees []Notifee
 }
 
 // Option defines the functional option type that can be used to configure
@@ -46,6 +48,29 @@ type Option func(*Reprovider)
 func MaxWorkers(count int) Option {
 	return func(p *Reprovider) {
 		p.workerLimit = count
+	}
+}
+
+type PublishResult struct {
+	Cid      cid.Cid
+	Err      error
+	Duration time.Duration
+}
+
+type Notifee func(result PublishResult)
+
+// Notify is an option to sign up a Notifee to get publishing results.
+func Notify(notifee Notifee) Option {
+	return func(p *Reprovider) {
+		p.notifees = append(p.notifees, notifee)
+	}
+}
+
+// notifyAll is a helper
+func (rp *Reprovider) notifyAll(cid cid.Cid, err error, d time.Duration) {
+	res := PublishResult{Cid: cid, Err: err, Duration: d}
+	for _, notifee := range rp.notifees {
+		notifee(res)
 	}
 }
 
@@ -128,9 +153,11 @@ func (rp *Reprovider) Reprovide() error {
 			defer wg.Done()
 
 			for c := range keychan {
+				start := time.Now()
 				// hash security
 				if err := verifcid.ValidateCid(c); err != nil {
 					logR.Errorf("insecure hash in reprovider, %s (%s)", c, err)
+					rp.notifyAll(c, err, time.Since(start))
 					continue
 				}
 				op := func() error {
@@ -142,6 +169,7 @@ func (rp *Reprovider) Reprovide() error {
 				}
 
 				err := backoff.Retry(op, backoff.WithContext(backoff.NewExponentialBackOff(), rp.ctx))
+				rp.notifyAll(c, err, time.Since(start))
 				if err != nil {
 					logR.Debugf("Providing failed after number of retries: %s", err)
 				}
