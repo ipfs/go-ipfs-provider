@@ -72,7 +72,7 @@ func TestMangledData(t *testing.T) {
 
 	// put bad data in the queue
 	queueKey := datastore.NewKey("/test/0")
-	err = queue.ds.Put(queueKey, []byte("borked"))
+	err = queue.ds.Put(ctx, queueKey, []byte("borked"))
 	if err != nil {
 		t.Fatal(err)
 	}

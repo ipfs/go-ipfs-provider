@@ -33,14 +33,18 @@ func setupRouting(t *testing.T) (clA, clB mock.Client, idA, idB peer.ID) {
 	return clA, clB, iidA.ID(), iidB.ID()
 }
 
-func setupDag(t *testing.T) (nodes []cid.Cid, bstore blockstore.Blockstore) {
+func setupDag(t *testing.T, ctx context.Context) (nodes []cid.Cid, bstore blockstore.Blockstore) {
 	bstore = blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	for _, data := range []string{"foo", "bar"} {
+
+		// TODO: I think this is now an incorrect encoding after the update to newer
+		// go-cid or related. Tests breaks because of that.
+
 		blk, err := cbor.WrapObject(data, mh.SHA2_256, -1)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = bstore.Put(blk)
+		err = bstore.Put(ctx, blk)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,7 +56,7 @@ func setupDag(t *testing.T) (nodes []cid.Cid, bstore blockstore.Blockstore) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = bstore.Put(blk)
+		err = bstore.Put(ctx, blk)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +87,7 @@ func testReprovide(t *testing.T, trigger func(r *Reprovider, ctx context.Context
 	defer cancel()
 
 	clA, clB, idA, _ := setupRouting(t)
-	nodes, bstore := setupDag(t)
+	nodes, bstore := setupDag(t, ctx)
 
 	keyProvider := NewBlockstoreProvider(bstore)
 	reprov := NewReprovider(ctx, time.Hour, clA, keyProvider)
@@ -193,7 +197,7 @@ func TestReprovidePinned(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	nodes, bstore := setupDag(t)
+	nodes, bstore := setupDag(t, ctx)
 
 	dag := merkledag.NewDAGService(bsrv.New(bstore, offline.Exchange(bstore)))
 
