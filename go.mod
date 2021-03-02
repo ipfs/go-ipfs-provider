@@ -17,7 +17,7 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-verifcid v0.0.1
 	github.com/ipld/go-ipld-prime v0.7.0
-	github.com/libp2p/go-libp2p-core v0.7.0
-	github.com/libp2p/go-libp2p-testing v0.3.0
+	github.com/libp2p/go-libp2p-core v0.8.5
+	github.com/libp2p/go-libp2p-testing v0.4.0
 	github.com/multiformats/go-multihash v0.0.14
 )
