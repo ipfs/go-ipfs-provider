@@ -1,6 +1,8 @@
 module github.com/ipfs/go-ipfs-provider
 
-go 1.12
+go 1.16
+
+retract [v1.0.0, v1.0.1]
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
