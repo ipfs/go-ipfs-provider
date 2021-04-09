@@ -102,6 +102,12 @@ func (q *Queue) work() {
 							log.Errorf("error deleting queue entry with key (%s), due to error (%s), stopping provider", head.Key, err)
 							return
 						}
+
+						if err := q.ds.Sync(k); err != nil {
+							log.Errorf("error syncing deletion of queue entry with key (%s), due to error (%s), stopping provider", head.Key, err)
+							continue
+						}
+
 						continue
 					}
 				} else {
@@ -124,6 +130,12 @@ func (q *Queue) work() {
 					log.Errorf("Failed to enqueue cid: %s", err)
 					continue
 				}
+
+				if err := q.ds.Sync(k); err != nil {
+					log.Errorf("Failed to sync enqueuing cid: %s", err)
+					continue
+				}
+
 			case dequeue <- c:
 				err := q.ds.Delete(k)
 
@@ -131,6 +143,12 @@ func (q *Queue) work() {
 					log.Errorf("Failed to delete queued cid %s with key %s: %s", c, k, err)
 					continue
 				}
+
+				if err := q.ds.Sync(k); err != nil {
+					log.Errorf("Failed to sync deleted queued cid %s with key %s: %s", c, k, err)
+					continue
+				}
+
 				c = cid.Undef
 			case <-q.ctx.Done():
 				return
