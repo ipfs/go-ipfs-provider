@@ -10,6 +10,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil"
 	"github.com/ipfs/go-fetcher"
+	fetcherhelpers "github.com/ipfs/go-fetcher/helpers"
 	blocks "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log"
 	"github.com/ipfs/go-verifcid"
@@ -184,7 +185,7 @@ type Pinner interface {
 }
 
 // NewPinnedProvider returns provider supplying pinned keys
-func NewPinnedProvider(onlyRoots bool, pinning Pinner, fetchConfig fetcher.FetcherConfig) KeyChanFunc {
+func NewPinnedProvider(onlyRoots bool, pinning Pinner, fetchConfig fetcher.Factory) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
 		set, err := pinSet(ctx, pinning, fetchConfig, onlyRoots)
 		if err != nil {
@@ -208,7 +209,7 @@ func NewPinnedProvider(onlyRoots bool, pinning Pinner, fetchConfig fetcher.Fetch
 	}
 }
 
-func pinSet(ctx context.Context, pinning Pinner, fetchConfig fetcher.FetcherConfig, onlyRoots bool) (*cidutil.StreamingSet, error) {
+func pinSet(ctx context.Context, pinning Pinner, fetchConfig fetcher.Factory, onlyRoots bool) (*cidutil.StreamingSet, error) {
 	set := cidutil.NewStreamingSet()
 
 	go func() {
@@ -235,7 +236,7 @@ func pinSet(ctx context.Context, pinning Pinner, fetchConfig fetcher.FetcherConf
 		for _, key := range rkeys {
 			set.Visitor(ctx)(key)
 			if !onlyRoots {
-				err := fetcher.BlockAll(ctx, session, cidlink.Link{key}, func(res fetcher.FetchResult) error {
+				err := fetcherhelpers.BlockAll(ctx, session, cidlink.Link{key}, func(res fetcher.FetchResult) error {
 					clink, ok := res.LastBlockLink.(cidlink.Link)
 					if ok {
 						set.Visitor(ctx)(clink.Cid)
