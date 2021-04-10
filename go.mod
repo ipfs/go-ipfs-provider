@@ -6,11 +6,12 @@ retract [v1.0.0, v1.0.1]
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
 	github.com/ipfs/go-blockservice v0.1.4
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-cidutil v0.0.2
 	github.com/ipfs/go-datastore v0.4.5
-	github.com/ipfs/go-fetcher v1.1.0
+	github.com/ipfs/go-fetcher v1.3.0
 	github.com/ipfs/go-ipfs-blockstore v0.1.4
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-exchange-offline v0.0.1
@@ -18,8 +19,9 @@ require (
 	github.com/ipfs/go-ipld-cbor v0.0.3
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-verifcid v0.0.1
-	github.com/ipld/go-ipld-prime v0.9.0
+	github.com/ipld/go-ipld-prime v0.9.1-0.20210402181957-7406578571d1
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/libp2p/go-libp2p-testing v0.4.0
 	github.com/multiformats/go-multihash v0.0.15
+	github.com/polydawn/refmt v0.0.0-20201211092308-30ac6d18308e // indirect
 )

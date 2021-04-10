@@ -9,8 +9,8 @@ import (
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	"github.com/ipfs/go-fetcher"
-	"github.com/ipfs/go-ipfs-blockstore"
+	bsfetcher "github.com/ipfs/go-fetcher/impl/blockservice"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	offline "github.com/ipfs/go-ipfs-exchange-offline"
 	mock "github.com/ipfs/go-ipfs-routing/mock"
 	cbor "github.com/ipfs/go-ipld-cbor"
@@ -196,7 +196,7 @@ func TestReprovidePinned(t *testing.T) {
 
 	nodes, bstore := setupDag(t)
 
-	fetchConfig := fetcher.NewFetcherConfig(bsrv.New(bstore, offline.Exchange(bstore)))
+	fetchConfig := bsfetcher.NewFetcherConfig(bsrv.New(bstore, offline.Exchange(bstore)))
 
 	for i := 0; i < 2; i++ {
 		clA, clB, idA, _ := setupRouting(t)
