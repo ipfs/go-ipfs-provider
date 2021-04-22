@@ -9,9 +9,6 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
-	"github.com/ipfs/go-datastore/query"
-	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	provider "github.com/ipfs/go-ipfs-provider"
 	"github.com/ipfs/go-ipfs-provider/simple"
 	logging "github.com/ipfs/go-log"
@@ -29,13 +26,13 @@ type BatchProvidingSystem struct {
 	rsys              provideMany
 	keyProvider       simple.KeyChanFunc
 
-	q                     *queue.Queue
-	ds, managedDS, timeDS datastore.Batching
+	q  *queue.Queue
+	ds datastore.Batching
 
-	provch, managedCh, dynamicCh chan cid.Cid
+	provch, dynamicCh chan cid.Cid
 
-	totalProvides  int
-	avgProvideTime time.Duration
+	totalProvides, lastReprovideBatchSize     int
+	avgProvideDuration, lastReprovideDuration time.Duration
 }
 
 var _ provider.System = (*BatchProvidingSystem)(nil)
@@ -48,8 +45,7 @@ type provideMany interface {
 // BatchProvidingSystem instances
 type Option func(system *BatchProvidingSystem) error
 
-var managedKey = datastore.NewKey("/provider/reprovide/managed")
-var timeKey = datastore.NewKey("/provider/reprovide/time")
+var lastReprovideKey = datastore.NewKey("/provider/reprovide/lastreprovide")
 
 func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingSystem, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -63,7 +59,6 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 		q:                 q,
 		ds:                datastore.NewMapDatastore(),
 		provch:            make(chan cid.Cid, 1),
-		managedCh:         make(chan cid.Cid, 1),
 		dynamicCh:         make(chan cid.Cid, 1),
 	}
 
@@ -72,9 +67,6 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 			return nil, err
 		}
 	}
-
-	s.managedDS = namespace.Wrap(s.ds, managedKey)
-	s.timeDS = namespace.Wrap(s.ds, timeKey)
 
 	return s, nil
 }
@@ -106,6 +98,8 @@ func (s *BatchProvidingSystem) Run() {
 		for {
 			pauseDetectTimer := time.NewTimer(time.Hour)
 			maxDurationCollectionTimer := time.NewTimer(time.Minute * 10)
+
+			performedReprovide := false
 		loop:
 			for {
 				select {
@@ -120,24 +114,10 @@ func (s *BatchProvidingSystem) Run() {
 				case c := <-s.provch:
 					m[c] = struct{}{}
 					pauseDetectTimer.Reset(time.Millisecond * 500)
-					continue
-				case c := <-s.managedCh:
-					m[c] = struct{}{}
-					pauseDetectTimer.Reset(time.Millisecond * 500)
-					continue
-				default:
-				}
-
-				select {
-				case c := <-s.provch:
-					m[c] = struct{}{}
-					pauseDetectTimer.Reset(time.Millisecond * 500)
-				case c := <-s.managedCh:
-					m[c] = struct{}{}
-					pauseDetectTimer.Reset(time.Millisecond * 500)
 				case c := <-s.dynamicCh:
 					m[c] = struct{}{}
 					pauseDetectTimer.Reset(time.Millisecond * 500)
+					performedReprovide = true
 				case <-pauseDetectTimer.C:
 					break loop
 				case <-maxDurationCollectionTimer.C:
@@ -155,6 +135,7 @@ func (s *BatchProvidingSystem) Run() {
 				}
 
 				keys = append(keys, c.Hash())
+				delete(m, c)
 			}
 
 			start := time.Now()
@@ -165,15 +146,21 @@ func (s *BatchProvidingSystem) Run() {
 			}
 			dur := time.Since(start)
 
-			totalProvideTime := int64(s.totalProvides) * int64(s.avgProvideTime)
-			s.avgProvideTime = time.Duration((totalProvideTime + int64(dur)) / int64(s.totalProvides+len(keys)))
+			totalProvideTime := int64(s.totalProvides) * int64(s.avgProvideDuration)
+			s.avgProvideDuration = time.Duration((totalProvideTime + int64(dur)) / int64(s.totalProvides+len(keys)))
 			s.totalProvides += len(keys)
 
-			for c := range m {
-				s.timeDS.Put(dshelp.CidToDsKey(c), storeTime(time.Now()))
-				delete(m, c)
+			if performedReprovide {
+				s.lastReprovideBatchSize = len(keys)
+				s.lastReprovideDuration = dur
+
+				if err := s.ds.Put(lastReprovideKey, storeTime(time.Now())); err != nil {
+					log.Errorf("could not store last reprovide time: %v", err)
+				}
+				if err := s.ds.Sync(lastReprovideKey); err != nil {
+					log.Errorf("could not perform sync of last reprovide time: %v", err)
+				}
 			}
-			s.timeDS.Sync(datastore.NewKey(""))
 		}
 	}()
 
@@ -255,37 +242,8 @@ func (s *BatchProvidingSystem) Reprovide(ctx context.Context) error {
 }
 
 func (s *BatchProvidingSystem) reprovide(ctx context.Context, force bool) error {
-	qres, err := s.managedDS.Query(query.Query{})
-	if err != nil {
-		return err
-	}
-
-	nextCh := qres.Next()
-managedCidLoop:
-	for {
-		select {
-		case r, ok := <-nextCh:
-			if !ok {
-				break managedCidLoop
-			}
-			c, err := dshelp.DsKeyToCid(datastore.NewKey(r.Key))
-			if err != nil {
-				log.Debugf("could not decode key %v as CID", r.Key)
-				continue
-			}
-
-			if !s.shouldReprovide(c) && !force {
-				continue
-			}
-
-			select {
-			case s.managedCh <- c:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+	if !s.shouldReprovide() && !force {
+		return nil
 	}
 
 	kch, err := s.keyProvider(ctx)
@@ -299,9 +257,6 @@ dynamicCidLoop:
 		case c, ok := <-kch:
 			if !ok {
 				break dynamicCidLoop
-			}
-			if !s.shouldReprovide(c) && !force {
-				continue
 			}
 
 			select {
@@ -317,23 +272,22 @@ dynamicCidLoop:
 	return nil
 }
 
-func (s *BatchProvidingSystem) getLastReprovideTime(c cid.Cid) (time.Time, error) {
-	k := dshelp.CidToDsKey(c)
-	val, err := s.timeDS.Get(k)
+func (s *BatchProvidingSystem) getLastReprovideTime() (time.Time, error) {
+	val, err := s.ds.Get(lastReprovideKey)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("could not get time for %v", k)
+		return time.Time{}, fmt.Errorf("could not get last reprovide time")
 	}
 
 	t, err := getTime(val)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("could not decode time for %v, got %q", k, string(val))
+		return time.Time{}, fmt.Errorf("could not decode last reprovide time, got %q", string(val))
 	}
 
 	return t, nil
 }
 
-func (s *BatchProvidingSystem) shouldReprovide(c cid.Cid) bool {
-	t, err := s.getLastReprovideTime(c)
+func (s *BatchProvidingSystem) shouldReprovide() bool {
+	t, err := s.getLastReprovideTime()
 	if err != nil {
 		log.Debugf(err.Error())
 		return false
@@ -345,128 +299,18 @@ func (s *BatchProvidingSystem) shouldReprovide(c cid.Cid) bool {
 	return true
 }
 
-// Stat returns the total number of provides we are responsible for,
-// the number that have been recently provided, the total number of provides we have done
-// since starting the system and the average time per provide
-func (s *BatchProvidingSystem) Stat(ctx context.Context) (int, int, int, time.Duration, error) {
-	// TODO: Overlap between managed + dynamic lists
-	total := 0
-	recentlyProvided := 0
+type BatchedProviderStats struct {
+	TotalProvides, LastReprovideBatchSize     int
+	AvgProvideDuration, LastReprovideDuration time.Duration
+}
 
-	qres, err := s.managedDS.Query(query.Query{})
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-	nextCh := qres.Next()
-managedCidLoop:
-	for {
-		select {
-		case r, ok := <-nextCh:
-			if !ok {
-				break managedCidLoop
-			}
-			total++
-			c, err := dshelp.DsKeyToCid(datastore.NewKey(r.Key))
-			if err != nil {
-				log.Debugf("could not decode key %v as CID", r.Key)
-				continue
-			}
-
-			t, err := s.getLastReprovideTime(c)
-			if err != nil {
-				log.Debugf(err.Error())
-				continue
-			}
-
-			if time.Since(t) < s.reprovideInterval {
-				recentlyProvided++
-			}
-		case <-ctx.Done():
-			return 0, 0, 0, 0, ctx.Err()
-		}
-	}
-
-	kch, err := s.keyProvider(ctx)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-dynamicCidLoop:
-	for {
-		select {
-		case c, ok := <-kch:
-			if !ok {
-				break dynamicCidLoop
-			}
-			total++
-			t, err := s.getLastReprovideTime(c)
-			if err != nil {
-				log.Debugf(err.Error())
-				continue
-			}
-
-			if time.Since(t) < s.reprovideInterval {
-				recentlyProvided++
-			}
-		case <-ctx.Done():
-			return 0, 0, 0, 0, ctx.Err()
-		}
-	}
-
+// Stat returns various stats about this provider system
+func (s *BatchProvidingSystem) Stat(ctx context.Context) (BatchedProviderStats, error) {
 	// TODO: Does it matter that there is no locking around the total+average values?
-	return total, recentlyProvided, s.totalProvides, s.avgProvideTime, nil
-}
-
-func (s *BatchProvidingSystem) ProvideLongterm(cids ...cid.Cid) error {
-	for _, c := range cids {
-		k := dshelp.CidToDsKey(c)
-		if err := s.managedDS.Put(k, []byte{}); err != nil {
-			return err
-		}
-	}
-	if err := s.managedDS.Sync(datastore.NewKey("")); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *BatchProvidingSystem) RemoveLongterm(cids ...cid.Cid) error {
-	for _, c := range cids {
-		k := dshelp.CidToDsKey(c)
-		if err := s.managedDS.Delete(k); err != nil {
-			return err
-		}
-	}
-	if err := s.managedDS.Sync(datastore.NewKey("")); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *BatchProvidingSystem) GetLongtermProvides(ctx context.Context) (<-chan cid.Cid, error) {
-	qres, err := s.managedDS.Query(query.Query{
-		KeysOnly: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ch := make(chan cid.Cid, 1)
-
-	go func() {
-		for r := range qres.Next() {
-			c, err := dshelp.DsKeyToCid(datastore.NewKey(r.Key))
-			if err != nil {
-				log.Debugf("could not decode key %v as CID", r.Key)
-			}
-			select {
-			case ch <- c:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return ch, nil
+	return BatchedProviderStats{
+		TotalProvides:          s.totalProvides,
+		LastReprovideBatchSize: s.lastReprovideBatchSize,
+		AvgProvideDuration:     s.avgProvideDuration,
+		LastReprovideDuration:  s.lastReprovideDuration,
+	}, nil
 }
