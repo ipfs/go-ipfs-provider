@@ -39,6 +39,7 @@ var _ provider.System = (*BatchProvidingSystem)(nil)
 
 type provideMany interface {
 	ProvideMany(ctx context.Context, keys []multihash.Multihash) error
+	Ready() bool
 }
 
 // Option defines the functional option type that can be used to configure
@@ -136,6 +137,15 @@ func (s *BatchProvidingSystem) Run() {
 
 				keys = append(keys, c.Hash())
 				delete(m, c)
+			}
+
+			for !s.rsys.Ready() {
+				log.Debugf("reprovider system not ready")
+				select {
+				case <-time.After(time.Minute):
+				case <-s.ctx.Done():
+					return
+				}
 			}
 
 			start := time.Now()
