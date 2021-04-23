@@ -2,6 +2,7 @@ package batched
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/ipfs/go-ipfs-provider/queue"
 	"strconv"
@@ -127,6 +128,11 @@ func (s *BatchProvidingSystem) Run() {
 					return
 				}
 			}
+
+			if len(m) == 0 {
+				continue
+			}
+
 			keys := make([]multihash.Multihash, 0, len(m))
 			for c := range m {
 				// hash security
@@ -284,6 +290,9 @@ dynamicCidLoop:
 
 func (s *BatchProvidingSystem) getLastReprovideTime() (time.Time, error) {
 	val, err := s.ds.Get(lastReprovideKey)
+	if errors.Is(err, datastore.ErrNotFound) {
+		return time.Time{}, nil
+	}
 	if err != nil {
 		return time.Time{}, fmt.Errorf("could not get last reprovide time")
 	}
