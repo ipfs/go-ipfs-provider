@@ -137,28 +137,28 @@ func (s *BatchProvidingSystem) Run() {
 
 				select {
 				case c := <-provCh:
-					m[c] = struct{}{}
-					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
-					if len(m) == 1 {
+					if len(m) == 0 {
 						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
 					}
+					m[c] = struct{}{}
+					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					continue
 				default:
 				}
 
 				select {
 				case c := <-provCh:
-					m[c] = struct{}{}
-					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
-					if len(m) == 1 {
+					if len(m) == 0 {
 						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
 					}
+					m[c] = struct{}{}
+					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 				case c := <-s.reprovideCh:
-					m[c] = struct{}{}
-					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
-					if len(m) == 1 {
+					if len(m) == 0 {
 						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
 					}
+					m[c] = struct{}{}
+					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
 					emptyTimer(maxCollectionDurationTimer)
