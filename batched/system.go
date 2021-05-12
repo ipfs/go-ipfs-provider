@@ -116,15 +116,7 @@ func (s *BatchProvidingSystem) Run() {
 		defer pauseDetectTimer.Stop()
 
 		for {
-			// Reset timers
-			if !pauseDetectTimer.Stop() {
-				<-pauseDetectTimer.C
-			}
 			pauseDetectTimer.Reset(maxTimeWaitingForProvides)
-
-			if !maxCollectionDurationTimer.Stop() {
-				<-maxCollectionDurationTimer.C
-			}
 			maxCollectionDurationTimer.Reset(maxCollectionDuration)
 
 			performedReprovide := false
@@ -133,7 +125,7 @@ func (s *BatchProvidingSystem) Run() {
 				select {
 				case c := <-provCh:
 					m[c] = struct{}{}
-					pauseDetectTimer.Reset(pauseDetectionThreshold)
+					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					continue
 				default:
 				}
@@ -141,14 +133,16 @@ func (s *BatchProvidingSystem) Run() {
 				select {
 				case c := <-provCh:
 					m[c] = struct{}{}
-					pauseDetectTimer.Reset(pauseDetectionThreshold)
+					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 				case c := <-s.dynamicCh:
 					m[c] = struct{}{}
-					pauseDetectTimer.Reset(pauseDetectionThreshold)
+					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
+					emptyTimer(maxCollectionDurationTimer)
 					break loop
 				case <-maxCollectionDurationTimer.C:
+					emptyTimer(pauseDetectTimer)
 					break loop
 				case <-s.ctx.Done():
 					return
@@ -250,6 +244,19 @@ func (s *BatchProvidingSystem) Run() {
 			}
 		}
 	}()
+}
+
+func emptyTimer(t *time.Timer) {
+	if !t.Stop() {
+		<-t.C
+	}
+}
+
+func resetTimer(t *time.Timer, dur time.Duration) {
+	if !t.Stop() {
+		<-t.C
+	}
+	t.Reset(dur)
 }
 
 func storeTime(t time.Time) []byte {
