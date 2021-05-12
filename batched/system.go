@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -20,8 +21,9 @@ import (
 var log = logging.Logger("provider.batched")
 
 type BatchProvidingSystem struct {
-	ctx   context.Context
-	close context.CancelFunc
+	ctx     context.Context
+	close   context.CancelFunc
+	closewg sync.WaitGroup
 
 	reprovideInterval time.Duration
 	rsys              provideMany
@@ -101,6 +103,9 @@ func (s *BatchProvidingSystem) Run() {
 	provCh := s.q.Dequeue()
 
 	go func() {
+		s.closewg.Add(1)
+		defer s.closewg.Done()
+
 		m := make(map[cid.Cid]struct{})
 		for {
 			pauseDetectTimer := time.NewTimer(time.Hour)
@@ -190,6 +195,9 @@ func (s *BatchProvidingSystem) Run() {
 	}()
 
 	go func() {
+		s.closewg.Add(1)
+		defer s.closewg.Done()
+
 		var initialReprovideCh, reprovideCh <-chan time.Time
 
 		// If reproviding is enabled (non-zero)
@@ -243,7 +251,9 @@ func parseTime(b []byte) (time.Time, error) {
 
 func (s *BatchProvidingSystem) Close() error {
 	s.close()
-	return s.q.Close()
+	err := s.q.Close()
+	s.closewg.Wait()
+	return err
 }
 
 func (s *BatchProvidingSystem) Provide(cid cid.Cid) error {
