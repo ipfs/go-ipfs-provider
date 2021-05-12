@@ -100,7 +100,6 @@ func KeyProvider(fn simple.KeyChanFunc) Option {
 func (s *BatchProvidingSystem) Run() {
 	const pauseDetectionThreshold = time.Millisecond * 500
 	const maxCollectionDuration = time.Minute * 10
-	const maxTimeWaitingForProvides = time.Hour
 
 	provCh := s.q.Dequeue()
 
@@ -110,15 +109,14 @@ func (s *BatchProvidingSystem) Run() {
 
 		m := make(map[cid.Cid]struct{})
 
-		maxCollectionDurationTimer := time.NewTimer(maxCollectionDuration)
-		pauseDetectTimer := time.NewTimer(maxTimeWaitingForProvides)
+		maxCollectionDurationTimer := time.NewTimer(time.Hour)
+		pauseDetectTimer := time.NewTimer(time.Hour)
+		emptyTimer(maxCollectionDurationTimer)
+		emptyTimer(pauseDetectTimer)
 		defer maxCollectionDurationTimer.Stop()
 		defer pauseDetectTimer.Stop()
 
 		for {
-			pauseDetectTimer.Reset(maxTimeWaitingForProvides)
-			maxCollectionDurationTimer.Reset(maxCollectionDuration)
-
 			performedReprovide := false
 		loop:
 			for {
@@ -133,6 +131,9 @@ func (s *BatchProvidingSystem) Run() {
 				case c := <-provCh:
 					m[c] = struct{}{}
 					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
+					if len(m) == 1 {
+						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
+					}
 					continue
 				default:
 				}
@@ -141,9 +142,15 @@ func (s *BatchProvidingSystem) Run() {
 				case c := <-provCh:
 					m[c] = struct{}{}
 					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
+					if len(m) == 1 {
+						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
+					}
 				case c := <-s.dynamicCh:
 					m[c] = struct{}{}
 					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
+					if len(m) == 1 {
+						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
+					}
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
 					emptyTimer(maxCollectionDurationTimer)
