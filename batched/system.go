@@ -32,7 +32,7 @@ type BatchProvidingSystem struct {
 	q  *queue.Queue
 	ds datastore.Batching
 
-	dynamicCh chan cid.Cid
+	reprovideCh chan cid.Cid
 
 	totalProvides, lastReprovideBatchSize     int
 	avgProvideDuration, lastReprovideDuration time.Duration
@@ -58,7 +58,7 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 		keyProvider:       nil,
 		q:                 q,
 		ds:                datastore.NewMapDatastore(),
-		dynamicCh:         make(chan cid.Cid),
+		reprovideCh:       make(chan cid.Cid),
 	}
 
 	for _, o := range opts {
@@ -153,7 +153,7 @@ func (s *BatchProvidingSystem) Run() {
 					if len(m) == 1 {
 						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
 					}
-				case c := <-s.dynamicCh:
+				case c := <-s.reprovideCh:
 					m[c] = struct{}{}
 					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					if len(m) == 1 {
@@ -320,16 +320,16 @@ func (s *BatchProvidingSystem) reprovide(ctx context.Context, force bool) error 
 		return err
 	}
 
-dynamicCidLoop:
+reprovideCidLoop:
 	for {
 		select {
 		case c, ok := <-kch:
 			if !ok {
-				break dynamicCidLoop
+				break reprovideCidLoop
 			}
 
 			select {
-			case s.dynamicCh <- c:
+			case s.reprovideCh <- c:
 			case <-ctx.Done():
 				return ctx.Err()
 			}
