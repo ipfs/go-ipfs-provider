@@ -99,6 +99,8 @@ func KeyProvider(fn simple.KeyChanFunc) Option {
 
 func (s *BatchProvidingSystem) Run() {
 	const pauseDetectionThreshold = time.Millisecond * 500
+	const maxCollectionDuration = time.Minute * 10
+	const maxTimeWaitingForProvides = time.Hour
 
 	provCh := s.q.Dequeue()
 
@@ -107,9 +109,23 @@ func (s *BatchProvidingSystem) Run() {
 		defer s.closewg.Done()
 
 		m := make(map[cid.Cid]struct{})
+
+		maxDurationCollectionTimer := time.NewTimer(maxCollectionDuration)
+		pauseDetectTimer := time.NewTimer(maxTimeWaitingForProvides)
+		defer maxDurationCollectionTimer.Stop()
+		defer pauseDetectTimer.Stop()
+
 		for {
-			pauseDetectTimer := time.NewTimer(time.Hour)
-			maxDurationCollectionTimer := time.NewTimer(time.Minute * 10)
+			// Reset timers
+			if !pauseDetectTimer.Stop() {
+				<-pauseDetectTimer.C
+			}
+			pauseDetectTimer.Reset(maxTimeWaitingForProvides)
+
+			if !maxDurationCollectionTimer.Stop() {
+				<-maxDurationCollectionTimer.C
+			}
+			maxDurationCollectionTimer.Reset(maxCollectionDuration)
 
 			performedReprovide := false
 		loop:
