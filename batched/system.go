@@ -111,8 +111,8 @@ func (s *BatchProvidingSystem) Run() {
 
 	provCh := s.q.Dequeue()
 
+	s.closewg.Add(1)
 	go func() {
-		s.closewg.Add(1)
 		defer s.closewg.Done()
 
 		m := make(map[cid.Cid]struct{})
@@ -227,8 +227,8 @@ func (s *BatchProvidingSystem) Run() {
 		}
 	}()
 
+	s.closewg.Add(1)
 	go func() {
-		s.closewg.Add(1)
 		defer s.closewg.Done()
 
 		var initialReprovideCh, reprovideCh <-chan time.Time
