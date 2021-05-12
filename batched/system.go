@@ -110,9 +110,9 @@ func (s *BatchProvidingSystem) Run() {
 
 		m := make(map[cid.Cid]struct{})
 
-		maxDurationCollectionTimer := time.NewTimer(maxCollectionDuration)
+		maxCollectionDurationTimer := time.NewTimer(maxCollectionDuration)
 		pauseDetectTimer := time.NewTimer(maxTimeWaitingForProvides)
-		defer maxDurationCollectionTimer.Stop()
+		defer maxCollectionDurationTimer.Stop()
 		defer pauseDetectTimer.Stop()
 
 		for {
@@ -122,10 +122,10 @@ func (s *BatchProvidingSystem) Run() {
 			}
 			pauseDetectTimer.Reset(maxTimeWaitingForProvides)
 
-			if !maxDurationCollectionTimer.Stop() {
-				<-maxDurationCollectionTimer.C
+			if !maxCollectionDurationTimer.Stop() {
+				<-maxCollectionDurationTimer.C
 			}
-			maxDurationCollectionTimer.Reset(maxCollectionDuration)
+			maxCollectionDurationTimer.Reset(maxCollectionDuration)
 
 			performedReprovide := false
 		loop:
@@ -148,7 +148,7 @@ func (s *BatchProvidingSystem) Run() {
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
 					break loop
-				case <-maxDurationCollectionTimer.C:
+				case <-maxCollectionDurationTimer.C:
 					break loop
 				case <-s.ctx.Done():
 					return
