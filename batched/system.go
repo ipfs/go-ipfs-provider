@@ -58,7 +58,7 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 		keyProvider:       nil,
 		q:                 q,
 		ds:                datastore.NewMapDatastore(),
-		dynamicCh:         make(chan cid.Cid, 1),
+		dynamicCh:         make(chan cid.Cid),
 	}
 
 	for _, o := range opts {
