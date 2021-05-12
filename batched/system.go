@@ -123,6 +123,13 @@ func (s *BatchProvidingSystem) Run() {
 		loop:
 			for {
 				select {
+				case <-maxCollectionDurationTimer.C:
+					emptyTimer(pauseDetectTimer)
+					break loop
+				default:
+				}
+
+				select {
 				case c := <-provCh:
 					m[c] = struct{}{}
 					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
