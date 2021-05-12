@@ -97,6 +97,8 @@ func KeyProvider(fn simple.KeyChanFunc) Option {
 }
 
 func (s *BatchProvidingSystem) Run() {
+	const pauseDetectionThreshold = time.Millisecond * 500
+
 	go func() {
 		m := make(map[cid.Cid]struct{})
 		for {
@@ -109,7 +111,7 @@ func (s *BatchProvidingSystem) Run() {
 				select {
 				case c := <-s.provch:
 					m[c] = struct{}{}
-					pauseDetectTimer.Reset(time.Millisecond * 500)
+					pauseDetectTimer.Reset(pauseDetectionThreshold)
 					continue
 				default:
 				}
@@ -117,10 +119,10 @@ func (s *BatchProvidingSystem) Run() {
 				select {
 				case c := <-s.provch:
 					m[c] = struct{}{}
-					pauseDetectTimer.Reset(time.Millisecond * 500)
+					pauseDetectTimer.Reset(pauseDetectionThreshold)
 				case c := <-s.dynamicCh:
 					m[c] = struct{}{}
-					pauseDetectTimer.Reset(time.Millisecond * 500)
+					pauseDetectTimer.Reset(pauseDetectionThreshold)
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
 					break loop
@@ -156,6 +158,7 @@ func (s *BatchProvidingSystem) Run() {
 				}
 			}
 
+			log.Debugf("starting provide of %d keys", len(keys))
 			start := time.Now()
 			err := s.rsys.ProvideMany(s.ctx, keys)
 			if err != nil {
@@ -165,8 +168,11 @@ func (s *BatchProvidingSystem) Run() {
 			dur := time.Since(start)
 
 			totalProvideTime := int64(s.totalProvides) * int64(s.avgProvideDuration)
+			recentAvgProvideDuration := time.Duration(int64(dur) / int64(len(keys)))
 			s.avgProvideDuration = time.Duration((totalProvideTime + int64(dur)) / int64(s.totalProvides+len(keys)))
 			s.totalProvides += len(keys)
+
+			log.Debugf("finished providing of %d keys. It took %v with an average of %v per provide", len(keys), dur, recentAvgProvideDuration)
 
 			if performedReprovide {
 				s.lastReprovideBatchSize = len(keys)
