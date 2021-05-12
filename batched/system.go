@@ -169,6 +169,8 @@ func (s *BatchProvidingSystem) Run() {
 
 			keys := make([]multihash.Multihash, 0, len(m))
 			for c := range m {
+				delete(m, c)
+
 				// hash security
 				if err := verifcid.ValidateCid(c); err != nil {
 					log.Errorf("insecure hash in reprovider, %s (%s)", c, err)
@@ -176,7 +178,6 @@ func (s *BatchProvidingSystem) Run() {
 				}
 
 				keys = append(keys, c.Hash())
-				delete(m, c)
 			}
 
 			for !s.rsys.Ready() {
