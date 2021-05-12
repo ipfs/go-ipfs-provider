@@ -50,11 +50,7 @@ type Option func(system *BatchProvidingSystem) error
 var lastReprovideKey = datastore.NewKey("/provider/reprovide/lastreprovide")
 
 func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingSystem, error) {
-	ctx, cancel := context.WithCancel(context.Background())
 	s := &BatchProvidingSystem{
-		ctx:   ctx,
-		close: cancel,
-
 		reprovideInterval: time.Hour * 24,
 		rsys:              provider,
 		keyProvider:       nil,
@@ -69,6 +65,12 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 			return nil, err
 		}
 	}
+
+	// This is after the options processing so we do not have to worry about leaking a context if there is an
+	// initialization error processing the options
+	ctx, cancel := context.WithCancel(context.Background())
+	s.ctx = ctx
+	s.close = cancel
 
 	return s, nil
 }
