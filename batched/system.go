@@ -233,7 +233,7 @@ func storeTime(t time.Time) []byte {
 	return val
 }
 
-func getTime(b []byte) (time.Time, error) {
+func parseTime(b []byte) (time.Time, error) {
 	tns, err := strconv.ParseInt(string(b), 10, 64)
 	if err != nil {
 		return time.Time{}, err
@@ -294,7 +294,7 @@ func (s *BatchProvidingSystem) getLastReprovideTime() (time.Time, error) {
 		return time.Time{}, fmt.Errorf("could not get last reprovide time")
 	}
 
-	t, err := getTime(val)
+	t, err := parseTime(val)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("could not decode last reprovide time, got %q", string(val))
 	}
