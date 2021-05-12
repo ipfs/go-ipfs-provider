@@ -67,6 +67,14 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 		}
 	}
 
+	if s.keyProvider == nil {
+		s.keyProvider = func(ctx context.Context) (<-chan cid.Cid, error) {
+			ch := make(chan cid.Cid)
+			close(ch)
+			return ch, nil
+		}
+	}
+
 	// This is after the options processing so we do not have to worry about leaking a context if there is an
 	// initialization error processing the options
 	ctx, cancel := context.WithCancel(context.Background())
