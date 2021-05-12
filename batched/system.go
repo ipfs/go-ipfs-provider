@@ -30,7 +30,7 @@ type BatchProvidingSystem struct {
 	q  *queue.Queue
 	ds datastore.Batching
 
-	provch, dynamicCh chan cid.Cid
+	dynamicCh chan cid.Cid
 
 	totalProvides, lastReprovideBatchSize     int
 	avgProvideDuration, lastReprovideDuration time.Duration
@@ -56,7 +56,6 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 		keyProvider:       nil,
 		q:                 q,
 		ds:                datastore.NewMapDatastore(),
-		provch:            make(chan cid.Cid, 1),
 		dynamicCh:         make(chan cid.Cid, 1),
 	}
 
@@ -99,6 +98,8 @@ func KeyProvider(fn simple.KeyChanFunc) Option {
 func (s *BatchProvidingSystem) Run() {
 	const pauseDetectionThreshold = time.Millisecond * 500
 
+	provCh := s.q.Dequeue()
+
 	go func() {
 		m := make(map[cid.Cid]struct{})
 		for {
@@ -109,7 +110,7 @@ func (s *BatchProvidingSystem) Run() {
 		loop:
 			for {
 				select {
-				case c := <-s.provch:
+				case c := <-provCh:
 					m[c] = struct{}{}
 					pauseDetectTimer.Reset(pauseDetectionThreshold)
 					continue
@@ -117,7 +118,7 @@ func (s *BatchProvidingSystem) Run() {
 				}
 
 				select {
-				case c := <-s.provch:
+				case c := <-provCh:
 					m[c] = struct{}{}
 					pauseDetectTimer.Reset(pauseDetectionThreshold)
 				case c := <-s.dynamicCh:
@@ -184,18 +185,6 @@ func (s *BatchProvidingSystem) Run() {
 				if err := s.ds.Sync(lastReprovideKey); err != nil {
 					log.Errorf("could not perform sync of last reprovide time: %v", err)
 				}
-			}
-		}
-	}()
-
-	go func() {
-		ch := s.q.Dequeue()
-		for {
-			select {
-			case c := <-ch:
-				s.provch <- c
-			case <-s.ctx.Done():
-				return
 			}
 		}
 	}()
