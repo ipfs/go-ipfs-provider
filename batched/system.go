@@ -128,7 +128,9 @@ func initialReprovideDelay(duration time.Duration) Option {
 }
 
 func (s *BatchProvidingSystem) Run() {
+	// how long we wait between the first provider we hear about and batching up the provides to send out
 	const pauseDetectionThreshold = time.Millisecond * 500
+	// how long we are willing to collect providers for the batch after we receive the first one
 	const maxCollectionDuration = time.Minute * 10
 
 	provCh := s.q.Dequeue()
@@ -139,54 +141,66 @@ func (s *BatchProvidingSystem) Run() {
 
 		m := make(map[cid.Cid]struct{})
 
+		// setup stopped timers
 		maxCollectionDurationTimer := time.NewTimer(time.Hour)
 		pauseDetectTimer := time.NewTimer(time.Hour)
-		emptyTimer(maxCollectionDurationTimer)
-		emptyTimer(pauseDetectTimer)
+		stopAndEmptyTimer(maxCollectionDurationTimer)
+		stopAndEmptyTimer(pauseDetectTimer)
+
+		// make sure timers are cleaned up
 		defer maxCollectionDurationTimer.Stop()
 		defer pauseDetectTimer.Stop()
 
+		resetTimersAfterReceivingProvide := func(firstProvide bool) {
+			if firstProvide {
+				// after receiving the first provider start up the timers
+				maxCollectionDurationTimer.Reset(maxCollectionDuration)
+				pauseDetectTimer.Reset(pauseDetectionThreshold)
+			} else {
+				// otherwise just do a full restart of the pause timer
+				stopAndEmptyTimer(pauseDetectTimer)
+				pauseDetectTimer.Reset(pauseDetectionThreshold)
+			}
+		}
+
 		for {
 			performedReprovide := false
+
+			// at the start of every loop the maxCollectionDurationTimer and pauseDetectTimer should be already be
+			// stopped and have empty channels
 		loop:
 			for {
 				select {
 				case <-maxCollectionDurationTimer.C:
-					emptyTimer(pauseDetectTimer)
+					// if this timer has fired then the pause timer has started so let's stop and empty it
+					stopAndEmptyTimer(pauseDetectTimer)
 					break loop
 				default:
 				}
 
 				select {
 				case c := <-provCh:
-					if len(m) == 0 {
-						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
-					}
+					resetTimersAfterReceivingProvide(len(m) == 0)
 					m[c] = struct{}{}
-					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					continue
 				default:
 				}
 
 				select {
 				case c := <-provCh:
-					if len(m) == 0 {
-						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
-					}
+					resetTimersAfterReceivingProvide(len(m) == 0)
 					m[c] = struct{}{}
-					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 				case c := <-s.reprovideCh:
-					if len(m) == 0 {
-						resetTimer(maxCollectionDurationTimer, maxCollectionDuration)
-					}
+					resetTimersAfterReceivingProvide(len(m) == 0)
 					m[c] = struct{}{}
-					resetTimer(pauseDetectTimer, pauseDetectionThreshold)
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
-					emptyTimer(maxCollectionDurationTimer)
+					// if this timer has fired then the max collection timer has started so let's stop and empty it
+					stopAndEmptyTimer(maxCollectionDurationTimer)
 					break loop
 				case <-maxCollectionDurationTimer.C:
-					emptyTimer(pauseDetectTimer)
+					// if this timer has fired then the pause timer has started so let's stop and empty it
+					stopAndEmptyTimer(pauseDetectTimer)
 					break loop
 				case <-s.ctx.Done():
 					return
@@ -288,17 +302,10 @@ func (s *BatchProvidingSystem) Run() {
 	}()
 }
 
-func emptyTimer(t *time.Timer) {
+func stopAndEmptyTimer(t *time.Timer) {
 	if !t.Stop() {
 		<-t.C
 	}
-}
-
-func resetTimer(t *time.Timer, dur time.Duration) {
-	if !t.Stop() {
-		<-t.C
-	}
-	t.Reset(dur)
 }
 
 func storeTime(t time.Time) []byte {
