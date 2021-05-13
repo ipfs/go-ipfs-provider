@@ -151,7 +151,8 @@ func (s *BatchProvidingSystem) Run() {
 		defer maxCollectionDurationTimer.Stop()
 		defer pauseDetectTimer.Stop()
 
-		resetTimersAfterReceivingProvide := func(firstProvide bool) {
+		resetTimersAfterReceivingProvide := func() {
+			firstProvide := len(m) == 0
 			if firstProvide {
 				// after receiving the first provider start up the timers
 				maxCollectionDurationTimer.Reset(maxCollectionDuration)
@@ -180,7 +181,7 @@ func (s *BatchProvidingSystem) Run() {
 
 				select {
 				case c := <-provCh:
-					resetTimersAfterReceivingProvide(len(m) == 0)
+					resetTimersAfterReceivingProvide()
 					m[c] = struct{}{}
 					continue
 				default:
@@ -188,10 +189,10 @@ func (s *BatchProvidingSystem) Run() {
 
 				select {
 				case c := <-provCh:
-					resetTimersAfterReceivingProvide(len(m) == 0)
+					resetTimersAfterReceivingProvide()
 					m[c] = struct{}{}
 				case c := <-s.reprovideCh:
-					resetTimersAfterReceivingProvide(len(m) == 0)
+					resetTimersAfterReceivingProvide()
 					m[c] = struct{}{}
 					performedReprovide = true
 				case <-pauseDetectTimer.C:
