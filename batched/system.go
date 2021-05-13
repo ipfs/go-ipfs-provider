@@ -25,9 +25,12 @@ type BatchProvidingSystem struct {
 	close   context.CancelFunc
 	closewg sync.WaitGroup
 
-	reprovideInterval time.Duration
-	rsys              provideMany
-	keyProvider       simple.KeyChanFunc
+	reprovideInterval        time.Duration
+	initalReprovideDelay     time.Duration
+	initialReprovideDelaySet bool
+
+	rsys        provideMany
+	keyProvider simple.KeyChanFunc
 
 	q  *queue.Queue
 	ds datastore.Batching
@@ -67,6 +70,17 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 		}
 	}
 
+	// Setup default behavior for the initial reprovide delay
+	//
+	// If the reprovide ticker is larger than a minute (likely),
+	// provide once after we've been up a minute.
+	//
+	// Don't provide _immediately_ as we might be just about to stop.
+	if !s.initialReprovideDelaySet && s.reprovideInterval > time.Minute {
+		s.initalReprovideDelay = time.Minute
+		s.initialReprovideDelaySet = true
+	}
+
 	if s.keyProvider == nil {
 		s.keyProvider = func(ctx context.Context) (<-chan cid.Cid, error) {
 			ch := make(chan cid.Cid)
@@ -101,6 +115,14 @@ func ReproviderInterval(duration time.Duration) Option {
 func KeyProvider(fn simple.KeyChanFunc) Option {
 	return func(system *BatchProvidingSystem) error {
 		system.keyProvider = fn
+		return nil
+	}
+}
+
+func initialReprovideDelay(duration time.Duration) Option {
+	return func(system *BatchProvidingSystem) error {
+		system.initialReprovideDelaySet = true
+		system.initalReprovideDelay = duration
 		return nil
 	}
 }
@@ -239,12 +261,9 @@ func (s *BatchProvidingSystem) Run() {
 			defer reprovideTicker.Stop()
 			reprovideCh = reprovideTicker.C
 
-			// If the reprovide ticker is larger than a minute (likely),
-			// provide once after we've been up a minute.
-			//
-			// Don't provide _immediately_ as we might be just about to stop.
-			if s.reprovideInterval > time.Minute {
-				initialReprovideTimer := time.NewTimer(time.Minute)
+			// if there is a non-zero initial reprovide time that was set in the initializer or if the fallback has been
+			if s.initialReprovideDelaySet {
+				initialReprovideTimer := time.NewTimer(s.initalReprovideDelay)
 				defer initialReprovideTimer.Stop()
 
 				initialReprovideCh = initialReprovideTimer.C
