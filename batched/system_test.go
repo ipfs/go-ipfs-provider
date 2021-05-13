@@ -2,22 +2,27 @@ package batched
 
 import (
 	"context"
-	"github.com/ipfs/go-cid"
-	mh "github.com/multiformats/go-multihash"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/sync"
+	dssync "github.com/ipfs/go-datastore/sync"
+	mh "github.com/multiformats/go-multihash"
+
 	q "github.com/ipfs/go-ipfs-provider/queue"
 )
 
 type mockProvideMany struct {
+	lk   sync.Mutex
 	keys []mh.Multihash
 }
 
 func (m *mockProvideMany) ProvideMany(ctx context.Context, keys []mh.Multihash) error {
+	m.lk.Lock()
+	defer m.lk.Unlock()
 	m.keys = keys
 	return nil
 }
@@ -26,13 +31,19 @@ func (m *mockProvideMany) Ready() bool {
 	return true
 }
 
+func (m *mockProvideMany) GetKeys() []mh.Multihash {
+	m.lk.Lock()
+	defer m.lk.Unlock()
+	return m.keys[:]
+}
+
 var _ provideMany = (*mockProvideMany)(nil)
 
 func TestBatched(t *testing.T) {
 	ctx := context.Background()
 	defer ctx.Done()
 
-	ds := sync.MutexWrap(datastore.NewMapDatastore())
+	ds := dssync.MutexWrap(datastore.NewMapDatastore())
 	queue, err := q.NewQueue(ctx, "test", ds)
 	if err != nil {
 		t.Fatal(err)
@@ -66,29 +77,31 @@ func TestBatched(t *testing.T) {
 			}
 		}()
 		return ch, nil
-	}))
+	}), initialReprovideDelay(0))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	batchSystem.Run()
 
+	var keys []mh.Multihash
 	for {
 		if ctx.Err() != nil {
 			t.Fatal("test hung")
 		}
-		if len(provider.keys) != 0 {
+		keys = provider.GetKeys()
+		if len(keys) != 0 {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
 
-	if len(provider.keys) != numProvides {
-		t.Fatalf("expected %d provider keys, got %d", numProvides, len(provider.keys))
+	if len(keys) != numProvides {
+		t.Fatalf("expected %d provider keys, got %d", numProvides, len(keys))
 	}
 
 	provMap := make(map[string]struct{})
-	for _, k := range provider.keys {
+	for _, k := range keys {
 		provMap[string(k)] = struct{}{}
 	}
 
