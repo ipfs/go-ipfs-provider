@@ -388,7 +388,7 @@ func (s *BatchProvidingSystem) getLastReprovideTime() (time.Time, error) {
 func (s *BatchProvidingSystem) shouldReprovide() bool {
 	t, err := s.getLastReprovideTime()
 	if err != nil {
-		log.Debugf(err.Error())
+		log.Debugf("getting last reprovide time failed: %s", err)
 		return false
 	}
 
