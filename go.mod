@@ -11,7 +11,7 @@ require (
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-cidutil v0.0.2
 	github.com/ipfs/go-datastore v0.4.5
-	github.com/ipfs/go-fetcher v1.4.0
+	github.com/ipfs/go-fetcher v1.5.0
 	github.com/ipfs/go-ipfs-blockstore v0.1.4
 	github.com/ipfs/go-ipfs-blocksutil v0.0.1
 	github.com/ipfs/go-ipfs-exchange-offline v0.0.1
