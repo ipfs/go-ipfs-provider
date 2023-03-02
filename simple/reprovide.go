@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
+	"github.com/Jorropo/channel"
 	"github.com/cenkalti/backoff"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil"
@@ -180,8 +182,8 @@ func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
 // Pinner interface defines how the simple.Reprovider wants to interact
 // with a Pinning service
 type Pinner interface {
-	DirectKeys(ctx context.Context) ([]cid.Cid, error)
-	RecursiveKeys(ctx context.Context) ([]cid.Cid, error)
+	DirectKeys(ctx context.Context) channel.ReadOnly[cid.Cid]
+	RecursiveKeys(ctx context.Context) channel.ReadOnly[cid.Cid]
 }
 
 // NewPinnedProvider returns provider supplying pinned keys
@@ -217,26 +219,25 @@ func pinSet(ctx context.Context, pinning Pinner, fetchConfig fetcher.Factory, on
 		defer cancel()
 		defer close(set.New)
 
-		dkeys, err := pinning.DirectKeys(ctx)
-		if err != nil {
-			logR.Errorf("reprovide direct pins: %s", err)
-			return
-		}
-		for _, key := range dkeys {
+		dkeys := pinning.DirectKeys(ctx)
+		for {
+			key, err := dkeys.ReadContext(ctx)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				logR.Errorf("reprovide direct pins: %s", err)
+				return
+			}
 			set.Visitor(ctx)(key)
-		}
-
-		rkeys, err := pinning.RecursiveKeys(ctx)
-		if err != nil {
-			logR.Errorf("reprovide indirect pins: %s", err)
-			return
 		}
 
 		session := fetchConfig.NewSession(ctx)
-		for _, key := range rkeys {
-			set.Visitor(ctx)(key)
+
+		err := pinning.RecursiveKeys(ctx).RangeContext(ctx, func(c cid.Cid) error {
+			set.Visitor(ctx)(c)
 			if !onlyRoots {
-				err := fetcherhelpers.BlockAll(ctx, session, cidlink.Link{Cid: key}, func(res fetcher.FetchResult) error {
+				err := fetcherhelpers.BlockAll(ctx, session, cidlink.Link{Cid: c}, func(res fetcher.FetchResult) error {
 					clink, ok := res.LastBlockLink.(cidlink.Link)
 					if ok {
 						set.Visitor(ctx)(clink.Cid)
@@ -244,10 +245,14 @@ func pinSet(ctx context.Context, pinning Pinner, fetchConfig fetcher.Factory, on
 					return nil
 				})
 				if err != nil {
-					logR.Errorf("reprovide indirect pins: %s", err)
-					return
+					return err
 				}
 			}
+			return nil
+		})
+		if err != nil {
+			logR.Errorf("reprovide indirect pins: %s", err)
+			return
 		}
 	}()
 

@@ -5,6 +5,7 @@ go 1.18
 retract [v1.0.0, v1.0.1]
 
 require (
+	github.com/Jorropo/channel v0.0.0-20230303124104-2821e25e07ff
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.4.0
@@ -23,6 +24,8 @@ require (
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/multiformats/go-multihash v0.2.1
 )
+
+replace github.com/Jorropo/channel => github.com/MichaelMure/channel v0.0.0-20230303132646-a77d888b67d4
 
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect

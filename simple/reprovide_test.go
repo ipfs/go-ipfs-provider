@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Jorropo/channel"
 	blocks "github.com/ipfs/go-block-format"
 	bsrv "github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
@@ -220,12 +221,32 @@ type mockPinner struct {
 	direct    []cid.Cid
 }
 
-func (mp *mockPinner) DirectKeys(ctx context.Context) ([]cid.Cid, error) {
-	return mp.direct, nil
+func (mp *mockPinner) DirectKeys(ctx context.Context) channel.ReadOnly[cid.Cid] {
+	c := channel.New[cid.Cid]()
+	go func() {
+		defer c.Close()
+		for _, p := range mp.direct {
+			err := c.WriteContext(ctx, p)
+			if err != nil {
+				return
+			}
+		}
+	}()
+	return c.ReadOnly()
 }
 
-func (mp *mockPinner) RecursiveKeys(ctx context.Context) ([]cid.Cid, error) {
-	return mp.recursive, nil
+func (mp *mockPinner) RecursiveKeys(ctx context.Context) channel.ReadOnly[cid.Cid] {
+	c := channel.New[cid.Cid]()
+	go func() {
+		defer c.Close()
+		for _, p := range mp.recursive {
+			err := c.WriteContext(ctx, p)
+			if err != nil {
+				return
+			}
+		}
+	}()
+	return c.ReadOnly()
 }
 
 func TestReprovidePinned(t *testing.T) {
