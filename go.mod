@@ -1,6 +1,6 @@
 module github.com/ipfs/go-ipfs-provider
 
-go 1.18
+go 1.19
 
 retract [v1.0.0, v1.0.1]
 
