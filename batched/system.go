@@ -20,6 +20,7 @@ import (
 
 var log = logging.Logger("provider.batched")
 
+// Deprecated: use github.com/ipfs/boxo/provider/batched.BatchProvidingSystem
 type BatchProvidingSystem struct {
 	ctx     context.Context
 	close   context.CancelFunc
@@ -50,10 +51,13 @@ type provideMany interface {
 
 // Option defines the functional option type that can be used to configure
 // BatchProvidingSystem instances
+//
+// Deprecated: use github.com/ipfs/boxo/provider/batched.Option
 type Option func(system *BatchProvidingSystem) error
 
 var lastReprovideKey = datastore.NewKey("/provider/reprovide/lastreprovide")
 
+// Deprecated: use github.com/ipfs/boxo/provider/batched.New
 func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingSystem, error) {
 	s := &BatchProvidingSystem{
 		reprovideInterval: time.Hour * 24,
@@ -98,6 +102,7 @@ func New(provider provideMany, q *queue.Queue, opts ...Option) (*BatchProvidingS
 	return s, nil
 }
 
+// Deprecated: use github.com/ipfs/boxo/provider/batched.Datastore
 func Datastore(batching datastore.Batching) Option {
 	return func(system *BatchProvidingSystem) error {
 		system.ds = batching
@@ -105,6 +110,7 @@ func Datastore(batching datastore.Batching) Option {
 	}
 }
 
+// Deprecated: use github.com/ipfs/boxo/provider/batched.ReproviderInterval
 func ReproviderInterval(duration time.Duration) Option {
 	return func(system *BatchProvidingSystem) error {
 		system.reprovideInterval = duration
@@ -112,6 +118,7 @@ func ReproviderInterval(duration time.Duration) Option {
 	}
 }
 
+// Deprecated: use github.com/ipfs/boxo/provider/batched.KeyProvider
 func KeyProvider(fn simple.KeyChanFunc) Option {
 	return func(system *BatchProvidingSystem) error {
 		system.keyProvider = fn
@@ -403,6 +410,7 @@ func (s *BatchProvidingSystem) shouldReprovide() bool {
 	return true
 }
 
+// Deprecated: use github.com/ipfs/boxo/provider/batched.BatchedProviderStats
 type BatchedProviderStats struct {
 	TotalProvides, LastReprovideBatchSize     int
 	AvgProvideDuration, LastReprovideDuration time.Duration

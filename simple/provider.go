@@ -16,6 +16,8 @@ import (
 var logP = logging.Logger("provider.simple")
 
 // Provider announces blocks to the network
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.Provider
 type Provider struct {
 	ctx context.Context
 	// the CIDs for which provide announcements should be made
@@ -30,9 +32,13 @@ type Provider struct {
 
 // Option defines the functional option type that can be used to configure
 // provider instances
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.Option
 type Option func(*Provider)
 
 // WithTimeout is an option to set a timeout on a provider
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.WithTimeout
 func WithTimeout(timeout time.Duration) Option {
 	return func(p *Provider) {
 		p.timeout = timeout
@@ -40,6 +46,8 @@ func WithTimeout(timeout time.Duration) Option {
 }
 
 // MaxWorkers is an option to set the max workers on a provider
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.MaxWorkers
 func MaxWorkers(count int) Option {
 	return func(p *Provider) {
 		p.workerLimit = count
@@ -47,6 +55,8 @@ func MaxWorkers(count int) Option {
 }
 
 // NewProvider creates a provider that announces blocks to the network using a content router
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.NewProvider
 func NewProvider(ctx context.Context, queue *q.Queue, contentRouting routing.ContentRouting, options ...Option) *Provider {
 	p := &Provider{
 		ctx:            ctx,

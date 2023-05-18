@@ -8,6 +8,8 @@ import (
 
 // System defines the interface for interacting with the value
 // provider system
+//
+// Deprecated: use github.com/ipfs/boxo/provider.System
 type System interface {
 	Run()
 	Close() error
@@ -21,6 +23,8 @@ type system struct {
 }
 
 // NewSystem constructs a new provider system from a provider and reprovider
+//
+// Deprecated: use github.com/ipfs/boxo/provider.NewSystem
 func NewSystem(provider Provider, reprovider Reprovider) System {
 	return &system{provider, reprovider}
 }
