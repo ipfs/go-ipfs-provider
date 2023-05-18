@@ -21,12 +21,18 @@ import (
 var logR = logging.Logger("reprovider.simple")
 
 // ErrClosed is returned by Trigger when operating on a closed reprovider.
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.ErrClosed
 var ErrClosed = errors.New("reprovider service stopped")
 
 // KeyChanFunc is function streaming CIDs to pass to content routing
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.KeyChanFunc
 type KeyChanFunc func(context.Context) (<-chan cid.Cid, error)
 
 // Reprovider reannounces blocks to the network
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.Reprovider
 type Reprovider struct {
 	// Reprovider context. Cancel to stop, then wait on closedCh.
 	ctx      context.Context
@@ -45,6 +51,8 @@ type Reprovider struct {
 }
 
 // NewReprovider creates new Reprovider instance.
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.NewReprovider
 func NewReprovider(ctx context.Context, reprovideInterval time.Duration, rsys routing.ContentRouting, keyProvider KeyChanFunc) *Reprovider {
 	ctx, cancel := context.WithCancel(ctx)
 	return &Reprovider{
@@ -171,6 +179,8 @@ func (rp *Reprovider) Trigger(ctx context.Context) error {
 // Strategies
 
 // NewBlockstoreProvider returns key provider using bstore.AllKeysChan
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.NewBlockstoreProvider
 func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
 		return bstore.AllKeysChan(ctx)
@@ -179,12 +189,16 @@ func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
 
 // Pinner interface defines how the simple.Reprovider wants to interact
 // with a Pinning service
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.Pinner
 type Pinner interface {
 	DirectKeys(ctx context.Context) ([]cid.Cid, error)
 	RecursiveKeys(ctx context.Context) ([]cid.Cid, error)
 }
 
 // NewPinnedProvider returns provider supplying pinned keys
+//
+// Deprecated: use github.com/ipfs/boxo/provider/simple.NewPinnedProvider
 func NewPinnedProvider(onlyRoots bool, pinning Pinner, fetchConfig fetcher.Factory) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
 		set, err := pinSet(ctx, pinning, fetchConfig, onlyRoots)

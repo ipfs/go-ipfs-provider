@@ -6,6 +6,14 @@
 [![Coverage Status](https://codecov.io/gh/ipfs/go-ipfs-provider/branch/master/graph/badge.svg)](https://codecov.io/gh/ipfs/go-ipfs-provider)
 [![Travis CI](https://travis-ci.org/ipfs/go-ipfs-provider.svg?branch=master)](https://travis-ci.org/ipfs/go-ipfs-provider)
 
+## ❗ This repo is no longer maintained.
+👉 We highly recommend switching to the maintained version at https://github.com/ipfs/boxo/tree/main/provider.
+🏎️ Good news!  There is [tooling and documentation](https://github.com/ipfs/boxo#migrating-to-boxo) to expedite a switch in your repo. 
+
+⚠️ If you continue using this repo, please note that security fixes will not be provided (unless someone steps in to maintain it).
+
+📚 Learn more, including how to take the maintainership mantle or ask questions, [here](https://github.com/ipfs/boxo/wiki/Copied-or-Migrated-Repos-FAQ).
+
 ## Background
 
 The provider system is responsible for announcing and reannouncing to the ipfs network that a node has content.

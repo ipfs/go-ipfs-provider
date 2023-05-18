@@ -7,6 +7,8 @@ import (
 )
 
 // Provider announces blocks to the network
+//
+// Deprecated: use github.com/ipfs/boxo/provider.Provider
 type Provider interface {
 	// Run is used to begin processing the provider work
 	Run()
@@ -17,6 +19,8 @@ type Provider interface {
 }
 
 // Reprovider reannounces blocks to the network
+//
+// Deprecated: use github.com/ipfs/boxo/provider.Reprovider
 type Reprovider interface {
 	// Run is used to begin processing the reprovider work and waiting for reprovide triggers
 	Run()

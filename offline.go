@@ -9,6 +9,8 @@ import (
 type offlineProvider struct{}
 
 // NewOfflineProvider creates a ProviderSystem that does nothing
+//
+// Deprecated: use github.com/ipfs/boxo/provider.NewOfflineProvider
 func NewOfflineProvider() System {
 	return &offlineProvider{}
 }

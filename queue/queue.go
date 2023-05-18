@@ -17,6 +17,8 @@ var log = logging.Logger("provider.queue")
 // Best-effort durability just means that cids in the process of being provided when a
 // crash or shutdown occurs may be in the queue when the node is brought back online
 // depending on whether the underlying datastore has synchronous or asynchronous writes.
+//
+// Deprecated: use github.com/ipfs/boxo/provider/queue.Queue
 type Queue struct {
 	// used to differentiate queues in datastore
 	// e.g. provider vs reprovider
@@ -32,6 +34,8 @@ type Queue struct {
 }
 
 // NewQueue creates a queue for cids
+//
+// Deprecated: use github.com/ipfs/boxo/provider/queue.NewQueue
 func NewQueue(ctx context.Context, name string, ds datastore.Datastore) (*Queue, error) {
 	namespaced := namespace.Wrap(ds, datastore.NewKey("/"+name+"/queue/"))
 	cancelCtx, cancel := context.WithCancel(ctx)
