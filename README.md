@@ -59,12 +59,6 @@ sys.Provide(cid)
 sys.Close()
 ```
 
-## Contribute
-
-PRs are welcome!
-
-Small note: If editing the Readme, please conform to the [standard-readme](https://github.com/RichardLitt/standard-readme) specification.
-
 ## License
 
 This library is dual-licensed under Apache 2.0 and MIT terms.
