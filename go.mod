@@ -18,7 +18,7 @@ require (
 	github.com/ipfs/go-ipfs-routing v0.3.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/go-verifcid v0.0.1
-	github.com/ipld/go-ipld-prime v0.11.0
+	github.com/ipld/go-ipld-prime v0.19.0
 	github.com/libp2p/go-libp2p v0.23.4
 	github.com/libp2p/go-libp2p-testing v0.12.0
 	github.com/multiformats/go-multihash v0.2.1
